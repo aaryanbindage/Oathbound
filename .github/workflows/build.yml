@@ -39,14 +39,18 @@ jobs:
         run: |
           node tests/test-built-app.js dist/win-unpacked/Oathbound.exe
           node tests/test-built-app.js dist/Oathbound-Portable-*.exe
-      - name: Test the app inside the Mac disk image
+      - name: Copy the app out of the Mac disk image
         if: runner.os == 'macOS'
         run: |
           hdiutil attach dist/*.dmg -mountpoint /tmp/oathbound-dmg -nobrowse
           ditto /tmp/oathbound-dmg/Oathbound.app /tmp/Oathbound.app
           hdiutil detach /tmp/oathbound-dmg
-          codesign --verify --deep --strict /tmp/Oathbound.app
-          node tests/test-built-app.js /tmp/Oathbound.app/Contents/MacOS/Oathbound
+      - name: Check the Mac app's signature
+        if: runner.os == 'macOS'
+        run: codesign --verify --deep --strict /tmp/Oathbound.app
+      - name: Test the Mac app
+        if: runner.os == 'macOS'
+        run: for i in 1 2 3 4 5; do node tests/test-built-app.js /tmp/Oathbound.app/Contents/MacOS/Oathbound; done
       - uses: actions/upload-artifact@v4
         with:
           name: oathbound-${{ matrix.os }}

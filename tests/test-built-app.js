@@ -113,4 +113,4 @@ async function open() {
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log('All built app checks passed.');
   process.exit(0);
-})().catch(err => { console.error('FAILED: ' + err.message); console.error('Data kept in ' + dataDir); process.exit(1); });
+})().catch(err => { if (process.env.GITHUB_ACTIONS) console.log('::error::' + err.message); console.error('FAILED: ' + err.message); console.error('Data kept in ' + dataDir); process.exit(1); });

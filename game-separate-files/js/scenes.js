@@ -180,12 +180,13 @@ const TitleScene = {
     if (Input.rep.down) { this.i = (this.i + 1) % this.opts.length; Sfx.play('move'); }
     if (Input.pressed.ok) {
       Sfx.play('ok');
+      Saves.notice = '';
       const o = this.opts[this.i];
       if (o === 'Continue') Game.run(Game.loadGame());
       else if (o === 'Load Game') SaveScene.open('load');
       else if (o === 'New Oath') Game.run((function* () { yield* Game.fadeOut(.4); CreateScene.enter(); Game.scene = CreateScene; yield* Game.fadeIn(.4); })());
-      else if (o === 'Fullscreen') { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => { }); } catch (e) { /* not available here */ } }
-      else if (o.startsWith('Sound')) { Sfx.muted = !Sfx.muted; if (Sfx.master) Sfx.master.gain.value = Sfx.muted ? 0 : .55; this.opts[this.i] = 'Sound: ' + (Sfx.muted ? 'off' : 'on'); }
+      else if (o === 'Fullscreen') Game.toggleFullscreen();
+      else if (o.startsWith('Sound')) { Game.toggleSound(); this.opts[this.i] = 'Sound: ' + (Sfx.muted ? 'off' : 'on'); }
       else if (o === 'Quit') window.desktop && window.desktop.quit();
     }
   },
@@ -196,8 +197,9 @@ const TitleScene = {
     text('OATHBOUND', W / 2, y, '#fff0c8', { align: 'center', scale: 4, shadow: '#3a2c60' });
     glow(W / 2, y + 16, 90, '#ffe08a', .18 + Math.sin(this.t * 2) * .05);
     text('A TALE OF THE KNIGHTS RADIANT', W / 2, y + 38, '#c8d4f0', { align: 'center' });
-    this.opts.forEach((o, i) => { const sel = i === this.i, yy = 180 + i * 13; if (sel) { g.fillStyle = 'rgba(232,200,119,.2)'; g.fillRect(W / 2 - 54, yy - 2, 108, 12); } text(o, W / 2, yy, sel ? '#ffe08a' : '#b0b8d0', { align: 'center' }); });
+    this.opts.forEach((o, i) => { const sel = i === this.i, yy = Math.min(180, 238 - this.opts.length * 13) + i * 13; if (sel) { g.fillStyle = 'rgba(232,200,119,.2)'; g.fillRect(W / 2 - 54, yy - 2, 108, 12); } text(o, W / 2, yy, sel ? '#ffe08a' : '#b0b8d0', { align: 'center' }); });
     text('Unofficial fan work. The world of Roshar was created by Brandon Sanderson.', W / 2, H - 11, '#6a7094', { align: 'center' });
+    if (Saves.notice) { const w = textW(Saves.notice) + 16; panel(W / 2 - w / 2, 4, w, 15, '#ffe08a'); text(Saves.notice, W / 2, 8, '#ffe8b0', { align: 'center' }); }
     text('Move: arrows/WASD   OK: Space/Z   Back: X   Menu: C', W / 2, H - 22, '#6a7094', { align: 'center' });
   }
 };
@@ -376,12 +378,13 @@ const MenuScene = {
       const opts = this.sysOpts(), o = opts[M.i];
       if (o === 'Save game') { Sfx.play('ok'); SaveScene.open('save'); }
       else if (o === 'Load game') { Sfx.play('ok'); SaveScene.open('load'); }
-      else if (o.startsWith('Sound')) { Sfx.muted = !Sfx.muted; if (Sfx.master) Sfx.master.gain.value = Sfx.muted ? 0 : .55; Sfx.play('ok'); }
+      else if (o.startsWith('Sound')) { Game.toggleSound(); Sfx.play('ok'); }
+      else if (o === 'Open save folder') { window.desktop.saves.openFolder(); Sfx.play('ok'); }
       else if (o === 'Return to title') { Sfx.play('back'); Game.toTitle(); }
       else if (o === 'Quit to desktop') { window.desktop && window.desktop.quit(); }
     }
   },
-  sysOpts() { const a = ['Save game', 'Load game', 'Sound: ' + (Sfx.muted ? 'off' : 'on'), 'Return to title']; if (window.desktop) a.push('Quit to desktop'); return a; },
+  sysOpts() { const a = ['Save game', 'Load game', 'Sound: ' + (Sfx.muted ? 'off' : 'on'), 'Return to title']; if (window.desktop) a.push('Open save folder', 'Quit to desktop'); return a; },
   updateSub() {
     const M = Menu, s = M.sub;
     if (Input.pressed.back) { Sfx.play('back'); M.sub = null; return; }
@@ -500,7 +503,7 @@ const MenuScene = {
   drawSystem() {
     this.sysOpts().forEach((op, i) => { const sel = Menu.i === i, y = 40 + i * 14; if (sel) { g.fillStyle = 'rgba(232,200,119,.2)'; g.fillRect(16, y - 2, 150, 12); } text(op, 22, y, sel ? '#ffffff' : '#d6d0c0'); });
     text('Keyboard', 200, 40, '#ffe08a');
-    ['Move: arrows or WASD', 'OK and timed presses: Space, Z, Enter', 'Back: X or Esc', 'Menu and infuse: C, Tab, or M', 'Fullscreen: F11 (desktop app)', 'Gamepads work too.'].forEach((l, i) => text(l, 200, 52 + i * 11, '#c8c0ae'));
+    ['Move: arrows or WASD', 'OK and timed presses: Space, Z, Enter', 'Back: X or Esc', 'Menu and infuse: C, Tab, or M', /Mac/.test(navigator.platform) ? 'Fullscreen: Ctrl+Cmd+F (desktop app)' : 'Fullscreen: F11 (desktop app)', 'Gamepads work too.'].forEach((l, i) => text(l, 200, 52 + i * 11, '#c8c0ae'));
   },
   drawSub() {
     const s = Menu.sub;
@@ -532,7 +535,7 @@ const SaveScene = {
   close() { Game.scene = this.prev; if (this.prev === TitleScene) TitleScene.refresh(); },
   doSave(id) {
     if (Game.save.call(Game, id)) { this.msg = 'Saved to slot ' + id + '.'; Sfx.play('heal'); }
-    else { this.msg = 'Could not save: this browser blocks storage. It lasts only until you close the page.'; Sfx.play('denied'); }
+    else { this.msg = Saves.failText(); Sfx.play('denied'); }
   },
   update() {
     if (Game.script) return;
@@ -542,7 +545,8 @@ const SaveScene = {
       if (Input.pressed.ok) {
         const c = this.confirm; this.confirm = null;
         if (c.kind === 'overwrite') this.doSave(c.id);
-        else { Saves.remove(c.id); Sfx.play('back'); this.msg = 'Save deleted.'; if (this.prev === TitleScene && !Saves.any()) this.close(); }
+        else if (Saves.remove(c.id)) { Sfx.play('back'); this.msg = 'Save deleted.'; if (this.prev === TitleScene && !Saves.any()) this.close(); }
+        else { Sfx.play('denied'); this.msg = 'Could not delete that save file. Close anything using it, then try again.'; }
       }
       return;
     }

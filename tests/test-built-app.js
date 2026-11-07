@@ -69,7 +69,7 @@ async function open() {
   assert.strictEqual(await a.ev('typeof require'), 'undefined', 'the game must not have Node access');
   assert.ok(await a.ev('canvas.width === 960'), 'expected the 960x540 renderer');
   assert.ok(await a.ev('Sfx.ac === null'), 'audio should wait for a key press');
-  assert.ok(await a.ev('new Set(canvas.getContext("2d").getImageData(0, 0, 960, 540).data.filter((_, i) => i % 4000 === 0)).size > 5'), 'the title screen should be drawn');
+  await a.until('new Set(canvas.getContext("2d").getImageData(0, 0, 960, 540).data.filter((_, i) => i % 4000 === 0)).size > 5', 'the title screen to be drawn');
   console.log('  ok  launches to the title, with no test code or Node access');
 
   await a.key('Enter');

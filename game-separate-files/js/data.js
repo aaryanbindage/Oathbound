@@ -67,7 +67,7 @@ const ORDERS = [
     traverse: 'You Lash yourself across the gap and fall sideways, laughing.',
     meet: 'You went out into the storm for a stranger\'s child. Do you know how long I have waited for someone that stupid?',
     bond: 'Aeri spins around your head like a scrap of wind, delighted with everything, including you.',
-    ideals: ['I will stand over those who cannot stand.', 'I will guard even those I hate, if guarding them is right.', 'I will reach for everyone. I accept the ones I cannot reach.'] },
+    ideals: ['I will protect those who cannot protect themselves.', 'I will protect even those I hate, so long as it is right.', 'I accept that there will be those I cannot protect.'] },
   { id: 'skybreaker', name: 'Skybreakers', surges: ['gravitation', 'division'], sprenKind: 'highspren', spren: 'Kesh', shape: 'star', color: '#9fb6ff', dark: '#37408f', creed: 'Measure every act against the law.',
     desc: 'Judges with wings. They hunt the guilty through open air, and their Division burns away what the law condemns.',
     passive: { key: 'verdict', name: 'Verdict', desc: '+25% damage against foes charging a void cast.' }, stat: { atk: 1.1, def: .98, hp: .98, sl: 1 },
@@ -75,7 +75,7 @@ const ORDERS = [
     traverse: 'You Lash yourself over the gap in a straight, lawful line.',
     meet: 'You broke curfew and a storm order to save that child. That is a violation. It is also the first interesting thing I have seen in a century.',
     bond: 'Kesh hangs in the air like a dark star with a hole in it and watches you for errors.',
-    ideals: ['I will carry justice to those the law forgot.', 'I will hold my own deeds to the measure I hold others\' to.', 'I will write down what the law should be, and answer for it.'] },
+    ideals: ['I will seek justice, to let it guide me, until I find a more perfect Ideal.', 'I will hold my own deeds to the measure I hold others\' to.', 'I will write down what the law should be, and answer for it.'] },
   { id: 'dustbringer', name: 'Dustbringers', surges: ['division', 'abrasion'], sprenKind: 'ashspren', spren: 'Cindra', shape: 'flame', color: '#ff9a5a', dark: '#8f3518', creed: 'Master the fire, and never let it master you.',
     desc: 'Feared and misunderstood. They burn stone to ash and slide through the fire, and they keep their power on a tight rein.',
     passive: { key: 'kindling', name: 'Kindling', desc: 'Basic strikes have a 30% chance to burn.' }, stat: { atk: 1.12, def: .95, hp: .97, sl: 1 },
@@ -139,7 +139,7 @@ const ORDERS = [
     traverse: 'You bind this side of the gap to the other, and walk across on the idea that they belong together.',
     meet: 'There are so few of your kind that I had nearly stopped looking. You held out a hand in a storm. Let us see how far your hand can reach.',
     bond: 'Vael shines at your shoulder, a warm gold thread of light that always seems tied to someone else.',
-    ideals: ['I will bind together those the world tore apart.', 'I will make no peace that leaves another in chains.', 'I will hold on when holding on hurts, and I will know when to let go.'] }
+    ideals: ['I will bind together those the world tore apart.', 'I will take responsibility for what I have done. If I must fall, I will rise each time a better man.', 'I will hold on when holding on hurts, and I will know when to let go.'] }
 ];
 const ORDER = id => ORDERS.find(o => o.id === id);
 

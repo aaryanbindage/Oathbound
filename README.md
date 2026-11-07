@@ -1,16 +1,55 @@
-# Oathbound project folder
+# Oathbound
+
+An unofficial, non-commercial fan RPG set on Roshar, the world of Brandon Sanderson's *The Stormlight Archive*. Not for sale.
+
+## Run it
+
+```
+npm install
+npm start          # play from source
+npm test           # save file tests
+npm run dist       # build the Windows installer and portable exe into dist/
+npm run dist:mac   # build the Mac disk image into dist/ (run this on a Mac)
+```
 
 ## What's here
 
 | Folder | Contents |
 |---|---|
-| `game-separate-files/` | The current game split into 10 JS files. Open `index.html` to play. Use this as the starting point for Electron. |
-| `single-file/oathbound.html` | The same game as one file, identical to the live claude.ai version. |
-| `single-file/oathbound-original.html` | The game before any of these changes. |
-| `screenshots/` | `before/` and `after/` shots of the same scenes, plus the new save screens. |
-| `tests/` | The save tests, the old vs new comparison, the playtime estimate and fight timings. |
+| `game-separate-files/` | The game, split into 10 JS files. |
+| `electron/` | The desktop app: window, crash handling, and `saves.js` for save files. |
+| `tests/` | Save tests, the built-app test, and the bot that plays the whole game. |
+| `tools/` | Draws the app icon into `build/`. |
 
-Live version: https://claude.ai/artifact/8cArxcdYrVEBvKttoJpt9d
+## Save files
+
+Saves are ordinary files, one per slot:
+
+| System | Folder |
+|---|---|
+| Windows | `%APPDATA%\Oathbound\saves` |
+| macOS | `~/Library/Application Support/Oathbound/saves` |
+| Linux | `~/.config/Oathbound/saves` |
+
+In the game, Menu > System > Open save folder takes you there.
+
+- **Files:** `autosave.json`, `slot-1.json`, `slot-2.json`, `slot-3.json`. Copy them to back up or move a game to another computer.
+- **Crash safety:** each save goes to a temporary file that is flushed to disk, then renamed into place, so an interrupted save can't damage the previous one.
+- **Backups:** the previous version of each save is kept as `<file>.bak`.
+- **Damaged saves:** a save that can't be read is moved to `saves/damaged/` and its backup takes over. The title screen says when this happens.
+- **Closing the window:** this autosaves if you are free to move. It does not autosave during a battle or cutscene, because story flags are ahead of the party's state at those moments.
+- **Uninstalling:** this leaves your saves in place.
+- **Older builds:** saves in browser storage move into files on first launch. Saves from the browser version of the game stay in that browser.
+
+The app also keeps `window.json` (window size and position) and `logs/oathbound.log` in the folder above `saves`.
+
+## Releasing
+
+Change `version` in `package.json` and the file names in `.github/release-notes.md`, then push a tag such as `v1.0.1`. GitHub Actions builds and tests the app on Windows and on both kinds of Mac, then publishes a release with all the downloads. If any of them fail, nothing is published.
+
+The builds aren't signed with a paid certificate, so people see a warning the first time they open the app. Removing it needs a Windows code signing certificate and an Apple Developer ID.
+
+The Linux settings are in `package.json` but have not been built or run.
 
 ## What changed
 
@@ -50,29 +89,17 @@ Saving from the pause menu or world map did not record the party's position, so 
 
 The files must load in the order listed in `game-separate-files/index.html`.
 
-## Moving to Electron
-
-These files have not been run inside Electron yet.
-
-- Point the Electron window at `game-separate-files/index.html`.
-- The game already looks for `window.desktop`, using `window.desktop.quit()` for its Quit options. Your preload script needs to provide that.
-- Claude account saving is skipped outside claude.ai, so saves fall back to browser storage. The save screen will say "this browser only", which should be reworded for a desktop app.
-- Saving to real files in the app's data folder is the better long-term option. The `Saves` object in `js/main.js` is the only code that would need to change on the game side.
-
 ## Tests
 
-Requires Node and Google Chrome on a Mac. Run from the `tests` folder.
-
 ```
-node save-tests.js                                     # single-file build
-node save-tests.js ../game-separate-files/index.html   # separate-files build
-node compare-builds.js                                 # old vs new screenshots and fight timings
-node playtime-estimate.js ../single-file/oathbound.html
+npm test                                            # save store unit tests, then real restarts of the app
+npm run bot                                         # plays the full game once per Order
+node tests/test-built-app.js dist/win-unpacked/Oathbound.exe    # key presses against a built app
+npx electron . --shots=ui                           # title, creation, menus, shop, withdraw, retry
+npx electron . --shots=gallery                      # screenshots of every map and battle, in test-output/
 ```
 
-`save-tests.js` and `compare-builds.js` write screenshots into `tests/`, and `compare-builds.js` also writes `results.json` there.
-
-The save tests use a stand-in for Claude account storage, so they do not prove the real service works.
+Tests use a temporary data folder, so they never touch your real saves. The test switches do nothing in a packaged build, and the harness isn't included in it.
 
 ## Playtime estimate
 

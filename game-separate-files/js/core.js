@@ -85,7 +85,8 @@ const TEXT_MODE_KEYS = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape'];
 window.addEventListener('keydown', e => { if (Input.textMode && !TEXT_MODE_KEYS.includes(e.code)) return; const a = KEYMAP[e.code]; if (a) { if (!e.repeat) Input.set(a, true); e.preventDefault(); } });
 window.addEventListener('keyup', e => { const a = KEYMAP[e.code]; if (a) Input.set(a, false); });
 window.addEventListener('blur', () => Input.clear());
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
+// On-screen buttons are for phones and tablets, not desktop windows on touchscreen laptops.
+if (!window.desktop && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) document.body.classList.add('touch');
 document.querySelectorAll('.tb').forEach(b => {
   const a = b.dataset.a;
   b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('on'); Input.set(a, true); });

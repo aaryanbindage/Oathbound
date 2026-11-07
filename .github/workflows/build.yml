@@ -1,0 +1,78 @@
+# Every push builds and tests the app on Windows and on both kinds of Mac.
+# Pushing a tag like v1.0.0 also publishes a GitHub release, but only if all of them pass.
+name: Build and release
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows, os: windows-latest, dist: 'npm run dist --' }
+          - { name: Mac Apple Silicon, os: macos-latest, dist: 'npm run dist:mac -- --arm64' }
+          - { name: Mac Intel, os: macos-15-intel, dist: 'npm run dist:mac -- --x64' }
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Play the whole game once
+        if: matrix.os == 'macos-latest'
+        run: node tests/bot-all.js .3 windrunner
+      - run: ${{ matrix.dist }} --publish never
+      - name: Test the built Windows apps
+        if: runner.os == 'Windows'
+        run: |
+          node tests/test-built-app.js dist/win-unpacked/Oathbound.exe
+          node tests/test-built-app.js dist/Oathbound-Portable-*.exe
+      - name: Copy the app out of the Mac disk image
+        if: runner.os == 'macOS'
+        run: |
+          hdiutil attach dist/*.dmg -mountpoint /tmp/oathbound-dmg -nobrowse
+          ditto /tmp/oathbound-dmg/Oathbound.app /tmp/Oathbound.app
+          hdiutil detach /tmp/oathbound-dmg || { sleep 5; hdiutil detach -force /tmp/oathbound-dmg; }
+      - name: Check the Mac app's signature
+        if: runner.os == 'macOS'
+        run: codesign --verify --deep --strict /tmp/Oathbound.app
+      - name: Test the Mac app
+        if: runner.os == 'macOS'
+        run: for i in 1 2 3; do node tests/test-built-app.js /tmp/Oathbound.app/Contents/MacOS/Oathbound; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oathbound-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.dmg
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" release-files/* --title "Oathbound $GITHUB_REF_NAME" --notes-file .github/release-notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}

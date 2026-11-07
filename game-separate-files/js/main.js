@@ -4,10 +4,12 @@ let S = null;
 const SAVE_KEY = 'oathbound.save.v1'; // The old single save; moved into a slot on first run.
 const SLOT_IDS = ['auto', '1', '2', '3'];
 const AREA_NAMES = { stonereach: 'Stonereach', crags: 'Windbreak Crags', chasm: 'The Sundered Deep', vault: 'The Vault of Oaths', shadesmar: 'Shadesmar', dais: 'The Oathgate Dais' };
-// Each slot is kept in this browser and, when the viewer has a Claude account here, in their private
+// In the desktop app each slot is a save file, handled by electron/saves.js.
+// In a browser each slot is kept in this browser and, when the viewer has a Claude account here, in their private
 // per-person storage. On load the newer copy of each slot wins; deleting leaves a marker so an old copy can't return.
+const SaveFiles = window.desktop && window.desktop.saves;
 const Saves = {
-  slots: {}, col: null, dirty: new Set(), writing: false, timer: null,
+  slots: {}, col: null, dirty: new Set(), writing: false, timer: null, notice: '',
   lsKey(id) { return 'oathbound.slot.' + id; },
   docId(id) { return 'oathbound-slot-' + id; },
   valid(r) {
@@ -20,11 +22,36 @@ const Saves = {
     return { savedAt: at, json: JSON.stringify(st), meta: { name: h.name, order: h.order, look: h.look, lvl: h.lvl, ideal: st.ideal, area: st.atWorld ? 'World map' : AREA_NAMES[st.map] || '', quest: st.quest || '', playT: st.playT || 0, gameId: st.gameId || null } };
   },
   init() {
+    if (SaveFiles) { this.initFiles(); return; }
     for (const id of SLOT_IDS) {
       try { const r = JSON.parse(localStorage.getItem(this.lsKey(id))); if (this.valid(r)) this.slots[id] = r; } catch (e) { /* storage blocked or unreadable */ }
     }
     this.migrate();
     this.connect();
+  },
+  initFiles() {
+    const res = SaveFiles.readAll();
+    for (const id of SLOT_IDS) if (this.valid(res.slots[id])) this.slots[id] = res.slots[id];
+    const name = id => id === 'auto' ? 'The autosave' : 'Slot ' + id;
+    if (res.error) this.notice = 'Could not open the save folder. New saves may fail.';
+    else if (res.notices.length) {
+      const n = res.notices[0];
+      this.notice = n.kind === 'restored' ? name(n.id) + ' was damaged, so its backup was restored.' : name(n.id) + ' could not be read. The file was kept in saves/damaged.';
+    }
+    this.importBrowserSaves();
+    this.migrate();
+  },
+  // Earlier builds of the app kept saves in browser storage. Each moves to a file once, and is only removed after it is written.
+  importBrowserSaves() {
+    for (const id of SLOT_IDS) {
+      try {
+        const raw = localStorage.getItem(this.lsKey(id)); if (!raw) continue;
+        const r = JSON.parse(raw), cur = this.get(id);
+        if (r.deleted || !this.valid(r)) { localStorage.removeItem(this.lsKey(id)); continue; }
+        if (cur && cur.savedAt >= r.savedAt) { localStorage.removeItem(this.lsKey(id)); continue; }
+        if (SaveFiles.write(id, r).ok) { this.slots[id] = r; localStorage.removeItem(this.lsKey(id)); }
+      } catch (e) { /* leave it in browser storage and try again next launch */ }
+    }
   },
   migrate() {
     try {
@@ -33,12 +60,13 @@ const Saves = {
       if (id && this.valid(rec) && this.storeLocal(id, rec)) { this.slots[id] = rec; localStorage.removeItem(SAVE_KEY); }
     } catch (e) { /* leave the old save where it is */ }
   },
-  storeLocal(id, rec) { try { localStorage.setItem(this.lsKey(id), JSON.stringify(rec)); return true; } catch (e) { return false; } },
+  storeLocal(id, rec) { if (SaveFiles) return SaveFiles.write(id, rec).ok; try { localStorage.setItem(this.lsKey(id), JSON.stringify(rec)); return true; } catch (e) { return false; } },
   get(id) { const r = this.slots[id]; return r && !r.deleted ? r : null; },
   latest() { let best = null; for (const id of SLOT_IDS) { const r = this.get(id); if (r && (!best || r.savedAt > this.get(best).savedAt)) best = id; } return best; },
   any() { return this.latest() !== null; },
   // Puts a record in a slot. False means it would not outlast this page: no browser storage and no account.
   put(id, rec, soon) {
+    if (SaveFiles) { const ok = SaveFiles.write(id, rec).ok; if (ok) this.slots[id] = rec; return ok; }
     this.slots[id] = rec;
     const local = this.storeLocal(id, rec);
     if (this.col) this.queue(id, soon);
@@ -50,7 +78,11 @@ const Saves = {
     if (old && old.meta.gameId !== rec.meta.gameId) { const free = ['1', '2', '3'].find(k => !this.get(k)); if (free) this.put(free, old, true); }
     return this.put(id, rec, soon);
   },
-  remove(id) { this.put(id, { savedAt: Date.now(), deleted: true }, true); },
+  remove(id) {
+    if (SaveFiles) { const ok = SaveFiles.remove(id).ok; if (ok) delete this.slots[id]; return ok; }
+    this.put(id, { savedAt: Date.now(), deleted: true }, true);
+    return true;
+  },
   queue(id, soon) {
     this.dirty.add(id);
     clearTimeout(this.timer);
@@ -91,7 +123,8 @@ const Saves = {
       if (Game.scene === TitleScene) TitleScene.refresh();
     } catch (e) { this.col = null; /* carry on with browser storage */ }
   },
-  status() { return this.col ? 'Saves are kept in your Claude account and this browser.' : 'Saves are kept in this browser only.'; }
+  failText() { return SaveFiles ? 'Could not write the save file. Check your free disk space, then try again.' : 'Could not save: this browser blocks storage. It lasts only until you close the page.'; },
+  status() { if (SaveFiles) return 'Saves are files on this computer.'; return this.col ? 'Saves are kept in your Claude account and this browser.' : 'Saves are kept in this browser only.'; }
 };
 window.addEventListener('pagehide', () => Saves.flush());
 document.addEventListener('visibilitychange', () => { if (document.hidden) Saves.flush(); });
@@ -137,7 +170,25 @@ const Game = {
   save(slot = 'auto') {
     if (!S) return false;
     this.capturePos();
-    return Saves.write(slot, Saves.makeRec(S), slot !== 'auto');
+    const ok = Saves.write(slot, Saves.makeRec(S), slot !== 'auto');
+    if (!ok && slot === 'auto' && SaveFiles && Field.map) Field.toast('Autosave failed. Save from the menu when you can.');
+    return ok;
+  },
+  // Only while the player is free to move: mid-cutscene or mid-battle, story flags are ahead of the party's real state.
+  canSafelyAutosave() {
+    let under = this.scene;
+    if (under === SaveScene) under = SaveScene.prev;
+    if (under === MenuScene) under = Menu.prev;
+    return !!S && !this.script && !this.ended && (under === FieldScene || under === WorldScene);
+  },
+  toggleSound() {
+    Sfx.muted = !Sfx.muted;
+    if (Sfx.master) Sfx.master.gain.value = Sfx.muted ? 0 : .55;
+    try { localStorage.setItem('oathbound.muted', Sfx.muted ? '1' : '0'); } catch (e) { /* remembered for this session only */ }
+  },
+  toggleFullscreen() {
+    if (window.desktop) { window.desktop.toggleFullscreen(); return; }
+    try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => { }); } catch (e) { /* not available here */ }
   },
   *loadGame(slot = Saves.latest()) {
     const rec = Saves.get(slot);
@@ -188,8 +239,15 @@ function frame(now) {
   if (steps) Game.render();
   requestAnimationFrame(frame);
 }
-window.addEventListener('error', e => { console.log('ERROR: ' + e.message + ' @' + e.filename + ':' + e.lineno); });
+// Closing the desktop window keeps your progress, so long as you were free to move when you closed it.
+window.addEventListener('beforeunload', () => { if (SaveFiles && Game.canSafelyAutosave()) Game.save(); });
+window.addEventListener('error', e => {
+  const msg = e.message + ' @' + e.filename + ':' + e.lineno;
+  console.log('ERROR: ' + msg);
+  if (window.desktop) window.desktop.fatal(msg + (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+});
 function boot() {
+  try { Sfx.muted = localStorage.getItem('oathbound.muted') === '1'; } catch (e) { /* default to sound on */ }
   Saves.init();
   Game.toTitle();
   Music.play('title');

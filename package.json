@@ -1,0 +1,69 @@
+{
+  "name": "oathbound",
+  "productName": "Oathbound",
+  "version": "1.0.1",
+  "description": "An unofficial, non-commercial fan RPG set on Roshar.",
+  "author": "aaryanbindage",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/save-store.test.js && node tests/save-files-e2e.js",
+    "bot": "node tests/bot-all.js",
+    "icon": "node tools/make-icon.js",
+    "dist": "npm run icon && electron-builder --win",
+    "dist:mac": "npm run icon && electron-builder --mac",
+    "dist:linux": "npm run icon && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.aaryanbindage.oathbound",
+    "productName": "Oathbound",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "game-separate-files/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "artifactName": "Oathbound-Setup-${version}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Oathbound",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Oathbound-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "target": "dmg",
+      "artifactName": "Oathbound-${version}-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "category": "public.app-category.role-playing-games",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game",
+      "icon": "build/icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  }
+}

@@ -4,10 +4,10 @@ An unofficial, non-commercial fan RPG set on Roshar, the world of Brandon Sander
 
 | Your computer | File |
 |---|---|
-| Windows | `Oathbound-Setup-1.0.1.exe` |
-| Windows, without installing | `Oathbound-Portable-1.0.1.exe` |
-| Mac with Apple Silicon (M1 or later) | `Oathbound-1.0.1-arm64.dmg` |
-| Mac with an Intel chip | `Oathbound-1.0.1-x64.dmg` |
+| Windows | `Oathbound-Setup-1.0.2.exe` |
+| Windows, without installing | `Oathbound-Portable-1.0.2.exe` |
+| Mac with Apple Silicon (M1 or later) | `Oathbound-1.0.2-arm64.dmg` |
+| Mac with an Intel chip | `Oathbound-1.0.2-x64.dmg` |
 
 To check your Mac's chip, open the Apple menu and choose About This Mac.
 
